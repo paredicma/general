@@ -19,7 +19,7 @@ from string import *
 #dirList.append([[True/False(Force Delete),'directory','extension'],[True/False,Percentage(80,90 vb.)],[True/False,hour],[True/False,'remoteServer','remoteDir']])
 dirList= []
 dirList.append([[True,'/tmp/test1/','.log'],[True,30],[True,48],[True,'10.10.10.215','/tmp/test/']])
-dirList.append([[False,'/tmp/test2/','.tar.gz'],[True,25],[True,1],[True,'172.21.162.215','/tmp/test/']])
+dirList.append([[False,'/tmp/test2/','.tar.gz'],[True,25],[True,1],[True,'10.10.10.215','/tmp/test/']])
 ##################PARAMETERS################################
 writeLogFile=True
 logFile='/tmp/disco.log'
