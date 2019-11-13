@@ -1,0 +1,164 @@
+pg1 IP :192.168.10.10 --> Primary
+pg2 IP :192.168.10.12 --> Hot Stanby
+
+
+1- Keygen Generate And Copy
+
+    [postgres@pg01 ~] ssh-keygen -t rsa
+    [postgres@pg02 ~] ssh-keygen -t rsa
+    [postgres@pg01 ~] ssh-copy-id -i .ssh/id_rsa.pub postgres@pg02
+    [postgres@pg02 ~] ssh-copy-id -i .ssh/id_rsa.pub postgres@pg01
+
+2- Create Streaming Replication User on Primary DB
+
+    psql# createuser -U postgres -p 5432 rep_user -P -c 10 -replication
+
+3- Primary DB pg_hba.conf configuration
+
+    [root@pg01 ~] vi /pgdata/data/postgresql.conf
+
+    Add below line
+
+    host replication rep_user 192.168.10.12/32 md5
+
+    [root@pg01 ~] systemctl reload postgresql.service
+
+4- Create Archive Directory on Hot Standby Server
+
+    [root@pg02 ~] mkdir -p /pgdata/ARCHIVELOG 
+
+5- Postgresql.conf configuration on Primary DB
+
+    [root@pg01 ~] vi /pgdata/data/postgresql.conf
+
+    Parameters change like below
+
+    listen_addresses = ‘192.168.10.10’
+
+    wal_level = replica # minimal, archive, hot_standby, or logical
+
+    archive_mode = on # enables archiving; off, on, or always
+    archive_command = ‘rsync -a %p postgres@192.168.10.12:/pgdata/ARCHIVELOG/%f’ # command to use to archive a logfile segment
+
+    max_wal_senders = 3 # max number of walsender processes
+    wal_keep_segments = 1000 # in logfile segments, 16MB each; 0 disables
+    max_replication_slots = 4 max number of replication slots # (change requires restart)
+
+    [root@pg01 ~] systemctl restart postgresql.service
+
+6- Base Backup  ( on Hot Standby Server )
+
+    [root@pg02 ~] systemctl stop postgresql.service
+
+    /pgdata/data directory has to be empty on hot standby server. pg_basebackup command will fill up that directory.
+
+    [root@pg02 ~] /usr/pgsql-9.6/bin/pg_basebackup -h 192.168.10.10 -D /pgdata/data -U rep_user -p 5432 -v -P –xlog-method=stream
+
+7- Postgresql.conf configuration on Hot Standby Server
+
+    Primary DB configuration has to be disabled with # mark.
+
+    #wal_level = hot_standby # minimal, archive, hot_standby, or logical
+
+    #archive_mode = on # enables archiving; off, on, or always
+    #archive_command = ‘rsync -a %p postgres@192.168.10.12:/pgdata/ARCHIVELOG/%f’ # command to use to archive a logfile segment
+
+    #max_wal_senders = 3 # max number of walsender processes
+    #wal_keep_segments = 1000 # in logfile segments, 16MB each; 0 disables
+    #max_replication_slots = 4
+
+    listen_addresses = ‘*’
+    hot_standby = on
+
+8- Create Recovery.conf file on Hot Standby Server
+
+    [root@pg02 ~] vi /pgdata/data/recovery.conf
+
+    restore_command = ‘cp /pgdata/ARCHIVELOG/%f %p’ # e.g. ‘cp /mnt/server/archivedir/%f %p’
+    archive_cleanup_command = ‘/usr/pgsql-9.5/bin/pg_archivecleanup /pgdata/ARCHIVELOG/%r’
+    standby_mode = on
+    primary_conninfo = ‘host=192.168.10.10 port=5432 user=rep_user password=rep_userpass’
+    trigger_file = ‘/pgdata/data/failover.uygula’
+
+    If you want to delay to apply committed values. You can use recovery_min_apply_delay parameter in recovery.conf like below.
+
+    recovery_min_apply_delay = 5min
+
+    This parameter provide 5 minutes delay. When you commit a transaction at primary side, hot standby will apply this transaction 5 minutes later.
+
+9- Start Hot Standby PostgreSQL Service
+
+    [root@pg02 ~] systemctl start postgresql.service
+
+10- Test
+
+    Primary DB
+    Replications list
+    psql# select * from pg_stat_replication ;
+
+    Sender process i çalışıyor olmalıdır.
+    ps -ef | grep sender
+    postgres 18388 18298 0 17:04 ? 00:00:00 postgres: wal sender process rep_user 192.168.10.12(33700) streaming 0/9000348
+
+    psql# create table test (name text);
+    psql# insert into test values(‘test’);
+
+    Hot Standby DB
+    Recovery mode check
+    psql# select pg_is_in_recovery();
+
+    Receiver process check
+    ps -ef | grep receiver
+    postgres 20936 20919 0 17:04 ? 00:00:00 postgres: wal receiver process streaming 0/9000268
+
+    psql# select * from test;
+
+
+12 - HotStandby sunucuyu senkron çalıştırmak istiyorsak birincil sunucudaki postgresql.conf dosyasında aşağıdaki  satır aktif edilerek gerekli şekilde düzenlenir. Bir veya birden fazla sekron standby tanımlanabilir.
+
+ synchronous_standby_names = '[application_name(or names seperate comma)]'
+
+Senkron replikasyonun getirisi olduğu gibi götürüsüde vardır.
+
+Veri Kaybı  (+) Pozitif etkisi vardır (Veri kaybı riskini azaltır).
+Performans  (-) Negatif etkisi vardır.
+Süreklilik  (-) Negatif etkisi vardır.
+
+13 - Cascading Replikasyon
+
+Postgresql de replika durumdaki sunucu başka bir replica sunucuya arşiv aktarabilir. Bu tarz replikasyon sistemlerini Cascading replikasyon denir. Bu sayede ana sunucuya yapılan replikasyon bağlantısı sayısı azaltılır ve ana sunucunun yükü hafifletilmiş olur.
+
+( Ana Sunucu ) -> archive log -> (Birincil Replika) -> archive log -> (İkincil Replika)
+
+14- Hot Stanby sunucu Master yapmanın iki yöntemi var.
+	a) touch /pgdata/data/failover.uygula  --> Komut ile tanımlanmış olan trigger file oluşturulur yada
+	b) pg_ctl -D /pgdata/data promote   --> Komutu ile master yapılabilir. 
+
+15- Eğer Eski Hot Stanby sunucu Master yapıldıktan sonra Eski Master ı tekrar aktif yapmak istersek eski master ı açmadan önce pg_rewind
+özelliği kullanılarak Hot stanby a yazılmış ve eski master da olmayan yeni data tamamlanır ve eski masterdan devam edilebilir. Bu komut çalıştığı esnada Hot stanby a yeni veri yazılması engellenmelidir.
+
+Not : Bu işlem öncesinde eski Master sunucuda db service i kapatılmış olmalıdır.
+Örneğin Master(Eski) sunucuda 
+
+  pg_rewind --target-pgdata=/pgdata/data   --source-server="host=192.168.10.12(Master a dönüşmüş hot standby ipsi) port=5432 user=postgres dbname=postgres"
+
+Eksik data filelar yukarıda komut ile tamamlandıktan sonra Eski master tekrar restart edilir.
+
+[root@pg01 ~] systemctl start postgresql.service
+
+
+https://www.scalingpostgres.com/tutorials/postgresql-replication-failback-pg-rewind/
+
+https://dbtut.com/index.php/2018/08/20/postgresql-pg_rewind/
+
+https://www.2ndquadrant.com/en/blog/pgrewind-and-pg95/
+
+https://valehagayev.wordpress.com/2018/08/15/postgresql-11-streaming-replication-hot-standby/
+
+
+
+
+
+
+
+
