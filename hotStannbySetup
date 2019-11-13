@@ -1,3 +1,6 @@
+	POSTGRESQL HOT STANDYBY SETUP
+	
+Servers
 pg1 IP :192.168.10.10 --> Primary
 pg2 IP :192.168.10.12 --> Hot Stanby
 
