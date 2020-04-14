@@ -78,34 +78,7 @@ def fileAppendWrite(file, writeText):
                                 fp.write(writeText+'\n')
                                 fp.close()
                 except :
-                                print (bcolors.FAIL+'!!! An error is occurred while writing file !!!'+bcolors.ENDC)
-def fileRead(file):
-                returnTEXT=""
-                try :
-                                fp=open(file,'r')
-                                returnTEXT=fp.readlines()
-                                fp.close()
-                                return returnTEXT
-                except :
-                                print (bcolors.FAIL+'!!! An error is occurred while reading file !!!'+bcolors.ENDC)
-                                return ""
-def fileReadFull(file):
-                returnTEXT=""
-                try :
-                                fp=open(file,'r')
-                                returnTEXT=fp.read()
-                                fp.close()
-                                return returnTEXT
-                except :
-                                print (bcolors.FAIL+'!!! An error is occurred while reading file !!!'+bcolors.ENDC)
-                                return ""
-def fileClearWrite(file, writeText):
-                try :
-                                fp=open(file,'w')
-                                fp.write(writeText+'\n')
-                                fp.close()
-                except :
-                                print (bcolors.FAIL+'!!! An error is occurred while writing file !!!'+bcolors.ENDC)
+                                print ('!!! An error is occurred while writing file !!!')
 def logWrite(logFile, sendMail ,logText):
                 if(writeLogFile):
                                 print (logText)
