@@ -22,8 +22,10 @@ dbList.append(['db3','2','all','tar',''])
 dbList.append(['db4','2','all','plain',' --compress=5 '])
 ########################DBLIST#######################
 ##################PARAMETERS##########################
-fullInstanceBackup= False
-fullRoleBackup= True
+fullInstanceBackup= True
+fullInstanceBackupKeepDay='7'
+RoleBackup= True
+RoleBackupKeepDay='7'
 myLogFile = 'backup.log'
 mailTO = 'msyavuz@gmail.com'
 sleepTime = 3	
@@ -41,33 +43,35 @@ totalDeletedOldBackup = 0
 ##################PARAMETERS##########################
 def makeRoleBackup( pgPort, backupDir, backupAlias):
 	global totalBackupSucceed, totalBackupFail
-	backupFileName='roles_'+backupAlias+get_datetime()+'.sql'
+	backupFileName=backupAlias+'roles_'+get_datetime()+'.sql'
 	cmdStatus=''
 	cmdResponse=''
 	if (dbSuperPass=='' ):
 		cmdStatus, cmdResponse = commands.getstatusoutput(binDir+'pg_dumpall -r -p '+pgPort+' -f '+backupDir+backupFileName)
 	else:
-		cmdStatus, cmdResponse = commands.getstatusoutput('export PGPASSWORD='+dbSuperPass+' ;'+binDir+'pg_dumpall -r -p '+pgPort+' -f '+backupDir+backupFileName+dbName)
+		cmdStatus, cmdResponse = commands.getstatusoutput('export PGPASSWORD='+dbSuperPass+' ;'+binDir+'pg_dumpall -r -p '+pgPort+' -f '+backupDir+backupFileName)
 	if(str(cmdStatus)=='0'):
 		totalBackupSucceed+=1
 		logWrite(myLogFile, False, 'INFO : Instance role backup completed: File Name ->' +backupDir+backupFileName)
+		delOldBackupFiles(backupDir,'roles',RoleBackupKeepDay,'')
 	else:
 		totalBackupFail+=1
 		logWrite(myLogFile, True,'ERROR : When Instance role backup proccess. Something went wrong. \nCheck proccess !!!\nFile Name ->' +backupDir+backupFileName)
 		return False
 def makeFullBackup( pgPort, backupDir, backupAlias):
 	global totalBackupSucceed, totalBackupFail
-	backupFileName='full_'+backupAlias+get_datetime()+'.sql'
+	backupFileName=backupAlias+'full_'+get_datetime()+'.dmp'
 	cmdStatus=''
 	cmdResponse=''
 	logWrite(myLogFile, False, 'INFO : Instance full backup is starting: File Name ->' +backupDir+backupFileName)
 	if (dbSuperPass=='' ):
-		cmdStatus, cmdResponse = commands.getstatusoutput(binDir+'pg_dumpall -r -p '+pgPort+' -f '+backupDir+backupFileName)
+		cmdStatus, cmdResponse = commands.getstatusoutput(binDir+'pg_dumpall -p '+pgPort+' -f '+backupDir+backupFileName)
 	else:
-		cmdStatus, cmdResponse = commands.getstatusoutput('export PGPASSWORD='+dbSuperPass+' ;'+binDir+'pg_dumpall -p '+pgPort+' -f '+backupDir+'full_'+backupFileName)
+		cmdStatus, cmdResponse = commands.getstatusoutput('export PGPASSWORD='+dbSuperPass+' ;'+binDir+'pg_dumpall -p '+pgPort+' -f '+backupDir+backupFileName)
 	if(str(cmdStatus)=='0'):
 		totalBackupSucceed+=1
 		logWrite(myLogFile, False, 'INFO : Instance full backup completed: File Name ->' +backupDir+backupFileName)
+		delOldBackupFiles(backupDir,'full',fullInstanceBackupKeepDay,'')
 	else:
 		totalBackupFail+=1
 		logWrite(myLogFile, True,'ERROR : When Instance full backup proccess. Something went wrong. \nCheck proccess !!!\nFile Name ->' +backupDir+backupFileName)
@@ -111,7 +115,7 @@ def makeDBBackup( pgPort, backupDir, backupAlias,dbName,keepDay,schemaList,backu
 		return False
 def delOldBackupFiles(backupDir, dbName, keepDay, backupFormat):
 	global totalDeletedOldBackup
-	cmdStatus, delFileNameArrayRaw = commands.getstatusoutput('find '+backupDir+backupAlias+dbName+'_'+backupFormat+'_'+'*.dmp -mtime +'+keepDay)
+	cmdStatus, delFileNameArrayRaw = commands.getstatusoutput('find '+backupDir+backupAlias+dbName+'_'+backupFormat+'*.dmp -mtime +'+keepDay)
 	if ( cmdStatus == 0  and len(delFileNameArrayRaw) > 1):
 		delFileNameArray=delFileNameArrayRaw.split("\n")
 		for delFileName in  delFileNameArray:
@@ -187,7 +191,7 @@ def logWrite(logFile, sendMail ,logText):
 ################ Main Function ############
 def main():
 	global totalBackupSucceed, totalBackupFail, totalBackupJob, totalDeletedOldBackup
-	if( fullRoleBackup ):
+	if( RoleBackup ):
 		makeRoleBackup(pgPort, backupDir, backupAlias)
 		totalBackupJob+=1
 	if ( fullInstanceBackup ) :
