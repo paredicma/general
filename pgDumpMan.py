@@ -1,4 +1,4 @@
-##################### # PostgreSQL pgDump Manager (pgDumpMan.py)  ############
+##################### # PostgreSQL pgDump Manager (pgDumpMan.py) ############
 #!/usr/bin/python
 #-*- coding: utf-8 -*-
 ## Author			: Mustafa YAVUZ
@@ -13,29 +13,30 @@ import commands
 from time import *
 import socket
 from string import *
-########################DBLIST####################### -
+########################DBLIST####################### - pg_dump
 ###dbList=[['db_name'],['backup_keep_day'],['include_schemas (comma seperated)'],['backup_format'][extraCommand]]
 dbList = []
-dbList.append(['db1','3','schema1,schema2','custom',''])
-dbList.append(['db2','4','all','directory',' --job=4 '])
-dbList.append(['db3','2','all','tar',''])
-dbList.append(['db4','2','all','plain',' --compress=5 '])
+dbList.append(['db1','7','schema1,schama2','custom',''])
+dbList.append(['db2','7','all','custom',''])
+dbList.append(['db3','7','all','plain',' --compress=5 ']) 
+dbList.append(['db4','7','all','directory',' --jobs=4 ']) 
+dbList.append(['db5','7','all','plain',' --compress=3 '])          
 ########################DBLIST#######################
 ##################PARAMETERS##########################
 fullInstanceBackup= True
-fullInstanceBackupKeepDay='7'
+fullInstanceBackupKeepDay='2'
 RoleBackup= True
 RoleBackupKeepDay='7'
-myLogFile = 'backup.log'
-mailTO = 'msyavuz@gmail.com'
-sleepTime = 3	
+myLogFile = '/var/lib/pgsql/scripts/log/pgDumpMan.log'
+mailTO = 'TEAM-DBA@my.company.com'
+sleepTime = 10  # 
 writeLogFile = True
 dbSuperUser = 'postgres'
 dbSuperPass	= ''
 pgPort='5432'
-backupDir='/pgdata/backup/'
-binDir = '/usr/pgsql-10/bin/'
-backupAlias='testdb-'
+backupDir='/backup/db_backup/'
+binDir = '/usr/pgsql-12/bin/'
+backupAlias='mydb-'
 totalBackupSucceed = 0
 totalBackupFail = 0
 totalBackupJob = 0
@@ -43,7 +44,7 @@ totalDeletedOldBackup = 0
 ##################PARAMETERS##########################
 def makeRoleBackup( pgPort, backupDir, backupAlias):
 	global totalBackupSucceed, totalBackupFail
-	backupFileName=backupAlias+'roles_'+get_datetime()+'.sql'
+	backupFileName=backupAlias+'roles_'+get_datetime()+'.dmp'
 	cmdStatus=''
 	cmdResponse=''
 	if (dbSuperPass=='' ):
@@ -62,22 +63,26 @@ def makeFullBackup( pgPort, backupDir, backupAlias):
 	global totalBackupSucceed, totalBackupFail
 	backupFileName=backupAlias+'full_'+get_datetime()+'.dmp'
 	cmdStatus=''
-	cmdResponse=''
 	logWrite(myLogFile, False, 'INFO : Instance full backup is starting: File Name ->' +backupDir+backupFileName)
+	backupStartTime=time()
+	cmdResponse=''
 	if (dbSuperPass=='' ):
 		cmdStatus, cmdResponse = commands.getstatusoutput(binDir+'pg_dumpall -p '+pgPort+' -f '+backupDir+backupFileName)
 	else:
 		cmdStatus, cmdResponse = commands.getstatusoutput('export PGPASSWORD='+dbSuperPass+' ;'+binDir+'pg_dumpall -p '+pgPort+' -f '+backupDir+backupFileName)
+	backupEndTime=time()
 	if(str(cmdStatus)=='0'):
 		totalBackupSucceed+=1
-		logWrite(myLogFile, False, 'INFO : Instance full backup completed: File Name ->' +backupDir+backupFileName)
-		delOldBackupFiles(backupDir,'full',fullInstanceBackupKeepDay,'')
+		mystatutus,dbDize=commands.getstatusoutput("du -sh "+backupDir+backupFileName+" | awk '{print $1}'")
+		logWrite(myLogFile, False, 'INFO : Instance full backup completed.\nTime -> '+str(backupEndTime-backupStartTime) +' second\nFile Name -> ' +backupDir+backupFileName+'\nFile Size -> '+str(dbDize))
+		delOldBackupFiles(backupDir,'full','',fullInstanceBackupKeepDay)
+
 	else:
 		totalBackupFail+=1
 		logWrite(myLogFile, True,'ERROR : When Instance full backup proccess. Something went wrong. \nCheck proccess !!!\nFile Name ->' +backupDir+backupFileName)
 		return False
 def makeDBBackup( pgPort, backupDir, backupAlias,dbName,keepDay,schemaList,backupFormat,extraCommand):
-	global totalBackupSucceed, totalBackupFail
+	global totalBackupSucceed, totalBackupFail, totalDeletedOldBackup
 	backupFileName=backupAlias+dbName+'_'+backupFormat+'_'+get_datetime()+'.dmp'
 	cmdStatus=''
 	cmdResponse=''	
@@ -96,8 +101,8 @@ def makeDBBackup( pgPort, backupDir, backupAlias,dbName,keepDay,schemaList,backu
 			backupParams += ' --schema='+schemaName+' '
 	if ( extraCommand != '' ) :
 		backupParams += ' '+extraCommand		
-	print backupParams
-	logWrite(myLogFile, False, 'INFO : backup is starting: File Name ->' +dbName)
+#	print backupParams
+	logWrite(myLogFile, False, 'INFO : backup is starting: DB Name ->' +dbName)
 	backupStartTime=time()
 	if (dbSuperPass=='' ):
 		cmdStatus, cmdResponse = commands.getstatusoutput(binDir+'pg_dump -p '+pgPort+' --dbname='+dbName+' '+backupParams+' -f '+backupDir+backupFileName)
@@ -115,8 +120,8 @@ def makeDBBackup( pgPort, backupDir, backupAlias,dbName,keepDay,schemaList,backu
 		return False
 def delOldBackupFiles(backupDir, dbName, keepDay, backupFormat):
 	global totalDeletedOldBackup
-	cmdStatus, delFileNameArrayRaw = commands.getstatusoutput('find '+backupDir+backupAlias+dbName+'_'+backupFormat+'*.dmp -mtime +'+keepDay)
-	if ( cmdStatus == 0  and len(delFileNameArrayRaw) > 1):
+	cmdStatus, delFileNameArrayRaw = commands.getstatusoutput('find '+backupDir+backupAlias+dbName+'_'+backupFormat+'_'+'*.dmp -mtime +'+keepDay)
+	if ( cmdStatus == 0 and len(delFileNameArrayRaw) > 1 ):
 		delFileNameArray=delFileNameArrayRaw.split("\n")
 		for delFileName in  delFileNameArray:
 			delResponse=os.system('rm -rf '+delFileName)
@@ -188,6 +193,14 @@ def logWrite(logFile, sendMail ,logText):
 			os.system('echo "'+logText+'" | mailx -s "pgDumpMan ('+str(os.uname()[1])+')" '+mailTO+' ')
 	else:
 		print ( logText )
+#	if(writeLogFile):
+#		print (logText)
+#		logText='* ('+get_datetime()+') '+logText
+#		fileAppendWrite(logFile,logText)
+#		if ( sendMail ):
+#			print 'mail sended'
+#	else:
+#		print (logText)
 ################ Main Function ############
 def main():
 	global totalBackupSucceed, totalBackupFail, totalBackupJob, totalDeletedOldBackup
