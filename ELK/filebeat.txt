@@ -1,0 +1,13 @@
+filebeat.inputs:
+
+- type: log
+  enabled: true
+  paths:
+    - /pgdata/data/log/mydb-*.log 
+  document_type: postgreslog
+
+
+tags: ["mydb"]
+
+output.logstash:
+  hosts: ["11.11.11.160:5042","11.11.11.64:5042","11.11.11.73:5042","11.11.11.77:5042","11.11.11.94:5042"]

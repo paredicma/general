@@ -1,0 +1,32 @@
+###Metricbeat config
+
+setup.template.settings:
+  index.number_of_shards: 5
+  index.codec: best_compression
+
+setup.kibana:
+
+  host: "11.11.11.160:5601"
+
+output.elasticsearch:
+  hosts: ["11.11.11.160:9200","11.11.11.64:9200","11.11.11.73:9200","11.11.11.77:9200","11.11.11.94:9200"]
+
+  protocol: "http"
+  username: "elastic"
+  password: "myPwd"
+
+setup.ilm.enabled: auto
+setup.ilm.rollover_alias: "postgres_metric"
+setup.ilm.pattern: "{now/d}-001" 
+
+###Postgresql config
+
+- module: postgresql
+  metricsets:
+    - database
+    - bgwriter
+    - activity
+  period: 10s
+  hosts: ["postgres://localhost:5432?sslmode=disable&database=postgres"]
+  username: monitor
+  password: passwordless

@@ -1,0 +1,54 @@
+
+input {
+  beats {
+    port => 5042
+  }
+}
+
+
+filter {
+
+    grok {
+      match => { "message" => "%{DATESTAMP:timestamp} %{DATA:tzone} %{DATA:client_name} %{DATA:db_name} %{DATA:user_name} %{DATA:app_name} %{DATA:proc_id} %{DATA:log_type} %{DATA:level}:  %{GREEDYDATA:msg} " }
+    }
+}
+output {
+  if "boss" in [tags] 
+  {
+    elasticsearch {
+    hosts => ["http://11.11.11.73:9200", "http://11.11.11.160:9200", "http://11.11.11.64:9200", "http://11.11.11.77:9200", "http://11.11.11.94:9200"]
+    index => "boss_postgres_log-%{+YYYY.MM.dd}"
+    user => "elastic"
+    password => "myPWD"
+          }
+  }
+  else if "test1" in [tags]
+  {
+    elasticsearch {
+    hosts => ["http://11.11.11.73:9200", "http://11.11.11.160:9200", "http://11.11.11.64:9200", "http://11.11.11.77:9200", "http://11.11.11.94:9200"]
+    index => "test1_postgres_log-%{+YYYY.MM.dd}"
+    user => "elastic"
+    password => "myPWD"
+          }
+  }
+   else if "test2" in [tags]
+  {
+    elasticsearch {
+    hosts => ["http://11.11.11.73:9200", "http://11.11.11.160:9200", "http://11.11.11.64:9200", "http://11.11.11.77:9200", "http://11.11.11.94:9200"]
+    index => "test2_postgres_log-%{+YYYY.MM.dd}"
+    user => "elastic"
+    password => "myPWD"
+          }
+  }
+  else
+  {
+    elasticsearch {
+    hosts => ["http://11.11.11.73:9200", "http://11.11.11.160:9200", "http://11.11.11.64:9200", "http://11.11.11.77:9200", "http://11.11.11.94:9200"]
+    index => "postgres_log-%{+YYYY.MM.dd}"
+    user => "elastic"
+    password => "myPWD"
+          }
+
+  }        
+
+}
