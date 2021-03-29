@@ -1,0 +1,25 @@
+
+1-  Sunucuların birinden sertifika oluşturulur. Şiflere boş geçilebilir.
+
+bin/elasticsearch-certutil ca
+bin/elasticsearch-certutil cert --ca elastic-stack-ca.p12
+
+2- tüm sunucuların elastic config dizinlerine oluşan sertifikalar kopyalanır. Dosya hakları  “chmod 600 “ olmalı
+
+cp elastic-stack-ca.p12 config/
+cp elastic-certificates.p12 config/
+
+3-  Elasticsearh yaml a aşağıdaki parametreler eklenir ve start edilir.
+
+xpack.security.transport.ssl.enabled: true
+xpack.security.transport.ssl.verification_mode: certificate 
+xpack.security.transport.ssl.keystore.path: elastic-certificates.p12 
+xpack.security.transport.ssl.truststore.path: elastic-certificates.p12
+
+
+
+nohup ./bin/logstash --path.data /data/logstashOralistener  -f config/oraListenerLog.conf &
+nohup ./bin/logstash --path.data /data/logstashPostgresql/  -f config/postgresqlLog.conf &
+nohup ./bin/logstash --path.data /data/logstashCassandra  -f config/cassandraLog.conf & 
+
+

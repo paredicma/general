@@ -1,0 +1,81 @@
+Elastic 7.5 Setup
+
+1- JAVA Configuration
+
+tar -xvf jdk-11.0.5_linux-x64_bin.tar.gz
+ln -s jdk-11.0.5 java
+
+
+2- Elastic setup
+
+tar -xvf elasticsearch-7.5.0-linux-x86_64.tar.gz
+ln -s elasticsearch-7.5.0 elasticsearch
+
+mkdir /data/elkdata
+mkdir /data/elklogs
+
+echo "export JAVA_HOME=/home/cassadm/java" >> .bash_profile
+echo "export PATH=/home/cassadm/java/bin/:/home/cassadm/elasticsearch/bin/:$PATH" >> .bash_profile
+echo "export PATH=$JAVA_HOME/bin:$PATH" >>.bash_profile
+
+
+cd elasticsearch
+
+sed -i 's/-Xms1g/-Xms32g/g' config/jvm.options
+sed -i 's/-Xmx1g/-Xmx32g/g' config/jvm.options
+
+sed -i 's/#cluster.name: my-application/cluster.name: evreka/g' config/elasticsearch.yml
+
+
+cluster.name: evreka
+node.name: node-1
+node.attr.rack: r1
+path.data: /data/elkdata
+path.logs: /data/elklogs
+bootstrap.memory_lock: true
+network.host: 10.20.30.238
+http.port: 9200
+discovery.seed_hosts: ["10.20.30.238", "10.20.30.240"]
+cluster.initial_master_nodes: ["10.20.30.238", "10.20.30.240"]
+gateway.recover_after_nodes: 3
+action.destructive_requires_name: true
+xpack.security.enabled: true
+
+
+./bin/elasticsearch-setup-passwords interactive
+
+3-  Kibana Setup
+
+tar -xvf kibana-7.5.0-linux-x86_64.tar.gz
+ln -s kibana-7.5.0-linux-x86_64 kibana
+
+
+
+4- Logstash Setup
+
+tar -xvf logstash-7.5.0.tar.gz
+ln -s logstash-7.5.0 logstash
+cd logstash
+vi config/logstash.yml 
+###################
+pipeline.workers: 8
+
+
+SSL SETUP
+
+
+bin/elasticsearch-certutil ca
+bin/elasticsearch-certutil cert --ca elastic-stack-ca.p12
+##bin/elasticsearch-certutil http
+
+mv elastic-* config/
+
+ elastic-stack-ca.p12
+ elastic-certificates.p12
+
+xpack.security.transport.ssl.enabled: true
+xpack.security.transport.ssl.verification_mode: certificate 
+xpack.security.transport.ssl.keystore.path: elastic-certificates.p12 
+xpack.security.transport.ssl.truststore.path: elastic-certificates.p12
+
+

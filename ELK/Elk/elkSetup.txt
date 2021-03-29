@@ -1,0 +1,59 @@
+tar -xvf elasticsearch-7.11.2-linux-x86_64.tar.gz
+ln -s elasticsearch-7.11.2 elasticsearch
+cd elasticsearch-7.11.2/
+
+vi /home/elkadmin/elasticsearch/config/jvm.options
+
+
+cd bin/
+./elasticsearch-certutil ca
+./elasticsearch-certutil cert --ca elastic-stack-ca.p12
+
+cp elastic-* config/
+cd config/
+chmod 600 elastic-*
+
+
+./elasticsearch-setup-passwords interactive
+
+MyPass_001
+
+vi /etc/sysctl.conf
+
+vm.max_map_count=262144
+net.ipv4.tcp_retries2=5
+vm.swappiness = 1
+
+
+tar -xvf kibana-7.11.2-linux-x86_64.tar.gz
+ln -s kibana-7.11.2-linux-x86_64 kibana
+
+Kibana config
+###################
+server.port: 5601
+server.host: "10.20.30.41"
+elasticsearch.hosts: ["http://10.20.30.41:9200","http://10.20.30.42:9200","http://10.20.30.43:9200"]
+kibana.index: ".kibana"
+elasticsearch.username: "kibana_system"
+elasticsearch.password: "MyPass_001"
+
+
+Elastic Config
+###################
+cluster.name: pars
+node.name: node-1
+node.attr.rack: r1
+path.data: /data/elkdata
+path.logs: /data/elklogs
+bootstrap.memory_lock: true
+network.host: 10.20.30.41
+http.port: 9200
+discovery.seed_hosts: ["10.20.30.41","10.20.30.42"]
+cluster.initial_master_nodes: ["10.20.30.41","10.20.30.42"]
+gateway.recover_after_nodes: 2
+action.destructive_requires_name: true
+xpack.security.enabled: true
+xpack.security.transport.ssl.enabled: true
+xpack.security.transport.ssl.verification_mode: certificate 
+xpack.security.transport.ssl.keystore.path: elastic-certificates.p12 
+xpack.security.transport.ssl.truststore.path: elastic-certificates.p12
